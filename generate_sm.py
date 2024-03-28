@@ -369,9 +369,11 @@ class WGAN_GP:
 
                 print("Access image")
                 images = Variable(self.data.__next__()).to(self.device)
+                print("Get batch size")
                 batch_size = images.size(0)
-
+                print("Critic")
                 d_loss_real = self.D(images)
+                print("Calculate loss")
                 d_loss_real = d_loss_real.mean()
 
                 print("Access noise")
