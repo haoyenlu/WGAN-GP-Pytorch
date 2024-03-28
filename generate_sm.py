@@ -367,12 +367,14 @@ class WGAN_GP:
                 self.D.zero_grad()
                 self.G.zero_grad()
 
+                print("Access image")
                 images = Variable(self.data.__next__()).to(self.device)
                 batch_size = images.size(0)
 
                 d_loss_real = self.D(images)
                 d_loss_real = d_loss_real.mean()
 
+                print("Access noise")
                 z = torch.randn(batch_size,self.z_dim).to(self.device)
                 fake_images = self.G(z)
                 d_loss_fake = self.D(fake_images)
