@@ -340,9 +340,7 @@ class WGAN_GP:
     def train(self,dataloader):
         print(f"Train on {self.device}")
 
-        print("Generator summary")
         summary(self.G,(64,128))
-        print("Discriminator summary")
         summary(self.D,(3,32,32))
 
         print("load data")
@@ -367,16 +365,12 @@ class WGAN_GP:
                 self.D.zero_grad()
                 self.G.zero_grad()
 
-                print("Access image")
+
                 images = Variable(self.data.__next__()).to(self.device)
-                print("Get batch size")
                 batch_size = images.size(0)
-                print("Critic")
                 d_loss_real = self.D(images)
-                print("Calculate loss")
                 d_loss_real = d_loss_real.mean()
 
-                print("Access noise")
                 z = torch.randn(batch_size,self.z_dim).to(self.device)
                 fake_images = self.G(z)
                 d_loss_fake = self.D(fake_images)
