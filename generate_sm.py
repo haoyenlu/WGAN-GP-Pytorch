@@ -340,8 +340,10 @@ class WGAN_GP:
     def train(self,dataloader):
         print(f"Train on {self.device}")
 
-        # summary(self.G,(1024,128))
-        # summary(self.D,(3,32,32))
+        print("Generator summary")
+        summary(self.G,(1024,128))
+        print("Discriminator summary")
+        summary(self.D,(3,32,32))
 
         print("load data")
         self.data = self.get_infinite_batches(dataloader)
