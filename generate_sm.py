@@ -300,8 +300,11 @@ class Discriminator(nn.Module):
 
 class WGAN_GP:
     def __init__(self,g_channel = 256,d_channel=128,z_dim=128,max_iters=100000,batch_size=128,G_checkpoint = None,D_checkpoint=None):
-        self.G = SMGenerator(z_dim,g_channel)
-        self.D = Discriminator(d_channel)
+        
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        self.G = SMGenerator(z_dim,g_channel).to(self.device)
+        self.D = Discriminator(d_channel).to(self.device)
 
         if G_checkpoint:
             print("Load Generator checkpoint")
@@ -312,8 +315,6 @@ class WGAN_GP:
             print("Load Discriminator checkpoint")
             ckpt = torch.load(D_checkpoint)
             self.D.load_state_dict(ckpt)
-
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.lr = 2e-4
         self.beta1 = 0
@@ -338,9 +339,6 @@ class WGAN_GP:
 
     def train(self,dataloader):
         print(f"Train on {self.device}")
-        
-        self.G.to(self.device)
-        self.D.to(self.device)
 
         # summary(self.G,(1024,128))
         # summary(self.D,(3,32,32))
