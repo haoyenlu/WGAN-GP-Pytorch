@@ -343,7 +343,6 @@ class WGAN_GP:
         summary(self.G,(64,128))
         summary(self.D,(3,32,32))
 
-        print("load data")
         self.data = self.get_infinite_batches(dataloader)
 
         fixed_noise = torch.randn(self.sample_size,self.z_dim).to(self.device)
@@ -358,7 +357,6 @@ class WGAN_GP:
 
             batch_size = self.batch_size
 
-            print("Start Training")
             self.G.train()
 
             for d_iter in range(self.n_critic):
