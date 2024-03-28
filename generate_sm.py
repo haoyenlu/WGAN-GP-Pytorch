@@ -341,7 +341,7 @@ class WGAN_GP:
         print(f"Train on {self.device}")
 
         print("Generator summary")
-        summary(self.G,(1024,128))
+        summary(self.G,(64,128))
         print("Discriminator summary")
         summary(self.D,(3,32,32))
 
