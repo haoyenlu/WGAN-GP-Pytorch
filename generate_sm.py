@@ -37,8 +37,8 @@ def get_cifar_dataset(batch_size = 64):
     train_dataset = torchvision.datasets.CIFAR10(root='./data',train=True,download=True,transform=transform)
     test_dataset = torchvision.datasets.CIFAR10(root='./data',train=False,download=True,transform=transform)
 
-    dataset = torch.utils.data.ConcatDataset([train_dataset,test_dataset])
-    dataloader = torch.utils.data.DataLoader(dataset,batch_size=batch_size,shuffle=True,num_workers=4)
+    dataset = torch.utils.data.ConcatDataset([train_dataset,test_dataset])  
+    dataloader = torch.utils.data.DataLoader(dataset,batch_size=batch_size,shuffle=True,num_workers=1)
 
     return dataloader
 
@@ -360,6 +360,7 @@ class WGAN_GP:
 
             batch_size = self.batch_size
 
+            print("Start Training")
             self.G.train()
 
             for d_iter in range(self.n_critic):
