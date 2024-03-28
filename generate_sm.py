@@ -15,6 +15,7 @@ import random
 import os
 
 import numpy as np
+import argparse
 
 G_ckpt_path = "./models/netG_SM"
 D_ckpt_path = "./models/netD_SM"
@@ -298,9 +299,19 @@ class Discriminator(nn.Module):
 
 
 class WGAN_GP:
-    def __init__(self,g_channel = 256,d_channel=128,z_dim=128,max_iters=100000,batch_size=128):
+    def __init__(self,g_channel = 256,d_channel=128,z_dim=128,max_iters=100000,batch_size=128,G_checkpoint = None,D_checkpoint=None):
         self.G = SMGenerator(z_dim,g_channel)
         self.D = Discriminator(d_channel)
+
+        if G_checkpoint:
+            print("Load Generator checkpoint")
+            ckpt = torch.load(G_checkpoint)
+            self.G.load_state_dict(ckpt)
+        
+        if D_checkpoint:
+            print("Load Discriminator checkpoint")
+            ckpt = torch.load(D_checkpoint)
+            self.D.load_state_dict(ckpt)
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -449,6 +460,13 @@ class WGAN_GP:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-g',help="Generator checkpoint",default=None)
+    parser.add_argument('-d',help="Discriminator checkpoint",default=None)
+    parser.add_argument('--max_iter',help="Max iterations for training",default=100000)
+    
+    args = parser.parse_args()
+
     batch_size = 128
 
     os.makedirs(G_ckpt_path,exist_ok=True)
@@ -478,7 +496,7 @@ if __name__ == '__main__':
     # summary(D,(3,32,32))
 
 
-    wgan_gp = WGAN_GP(g_channel=256,batch_size=batch_size)
+    wgan_gp = WGAN_GP(g_channel=256,batch_size=batch_size,max_iters=args.max_iter,G_checkpoint=args.g,D_checkpoint=args.d)
     wgan_gp.train(dataloader)
 
 

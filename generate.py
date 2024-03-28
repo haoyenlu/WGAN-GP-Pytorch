@@ -13,7 +13,7 @@ from pytorch_gan_metrics import get_inception_score
 
 import random
 import math
-
+import argparse
 import numpy as np
 
 G_ckpt_path = "./models/netG"
@@ -216,9 +216,20 @@ class Discriminator(nn.Module):
 
 
 class WGAN_GP:
-    def __init__(self,g_channel = 256,d_channel=128,z_dim=128,max_iters=100000,batch_size=128):
+    def __init__(self,g_channel = 256,d_channel=128,z_dim=128,max_iters=100000,batch_size=128,G_checkpoint = None,D_checkpoint=None):
         self.G = Generator(z_dim,g_channel)
         self.D = Discriminator(d_channel)
+
+        if G_checkpoint:
+            print("Load Generator checkpoint")
+            ckpt = torch.load(G_checkpoint)
+            self.G.load_state_dict(ckpt)
+        
+        if D_checkpoint:
+            print("Load Discriminator checkpoint")
+            ckpt = torch.load(D_checkpoint)
+            self.D.load_state_dict(ckpt)
+
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -367,7 +378,15 @@ class WGAN_GP:
 
 
 if __name__ == '__main__':
-    batch_size = 128
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--G_ckpt','-g',help="Generator checkpoint",default=None)
+    parser.add_argument('--D_ckpt','-d',help="Discriminator checkpoint",default=None)
+    parser.add_argument('--max_iter',help="Max iterations for training",default=100000)
+    parser.add_argument('--batch_size',help="Batch size for training",default=128)
+    args = parser.parse_args()
+
+
+    batch_size = args.batch_size
 
     # Set random seed
     randm_seed = random.randint(1,10000)
@@ -393,7 +412,7 @@ if __name__ == '__main__':
     # summary(D,(3,32,32))
 
 
-    wgan_gp = WGAN_GP(g_channel=256,batch_size=batch_size)
+    wgan_gp = WGAN_GP(g_channel=256,batch_size=batch_size,max_iters=args.max_iter,G_checkpoint=args.G_ckpt,D_checkpoint=args.D_ckpt)
     wgan_gp.train(dataloader)
 
 
