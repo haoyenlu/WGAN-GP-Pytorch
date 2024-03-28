@@ -1,5 +1,7 @@
+__pycache__/
 data/
 runs/
 models/
+inception_model/
 
 images.png

@@ -11,36 +11,9 @@ from torch.nn.utils.parametrizations import spectral_norm
 
 from pytorch_gan_metrics import get_inception_score
 
-import random
+import numpy as np
 import os
 
-import numpy as np
-import argparse
-
-G_ckpt_path = "./models/netG_SM"
-D_ckpt_path = "./models/netD_SM"
-
-
-torch.backends.cudnn.benchmark = True
-
-
-
-transform = transforms.Compose([
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
-
-
-def get_cifar_dataset(batch_size = 64):
-    train_dataset = torchvision.datasets.CIFAR10(root='./data',train=True,download=True,transform=transform)
-    test_dataset = torchvision.datasets.CIFAR10(root='./data',train=False,download=True,transform=transform)
-
-    dataset = torch.utils.data.ConcatDataset([train_dataset,test_dataset])  
-    dataloader = torch.utils.data.DataLoader(dataset,batch_size=batch_size,shuffle=True,num_workers=1)
-
-    return dataloader
 
 class SM_Layer(nn.Module): # forward the 
     def __init__(self,input_size,hidden_size,output_size):
@@ -123,6 +96,7 @@ class ResBlockUp_SM(nn.Module): # self-modulate batch norm
         _x = self.conv2(_x)
 
         return _x + self.shortcut(x)
+
 
 class ResBlockUp(nn.Module):
     def __init__(self,in_channel=256,out_channel=256,kernel_size=3,padding="same"):
@@ -234,8 +208,6 @@ class ResBlockDown(nn.Module):
         return self.residual(x) + self.shortcut(x)
 
  
-
-    
 class SMGenerator(nn.Module):
     def __init__(self,z_dim=128,channel=256):
         super(SMGenerator,self).__init__()
@@ -272,6 +244,41 @@ class SMGenerator(nn.Module):
 
         return self.output(out)
     
+class Generator(nn.Module):
+    def __init__(self,z_dim=128,channel=256):
+        super(Generator,self).__init__()
+
+        self.ch = channel
+        self.linear = nn.Linear(z_dim,4*4*channel)
+
+        self.blocks = nn.Sequential(
+            ResBlockUp(in_channel=channel,out_channel=channel,kernel_size=3),
+            ResBlockUp(in_channel=channel,out_channel=channel,kernel_size=3),
+            ResBlockUp(in_channel=channel,out_channel=channel,kernel_size=3)
+        )
+
+        self.output = nn.Sequential(
+            nn.BatchNorm2d(channel),
+            nn.ReLU(),
+            nn.Conv2d(channel,3,kernel_size=3,padding="same"),
+            nn.Tanh()
+        )
+        self.initialize()
+
+    def initialize(self):
+        torch.nn.init.xavier_normal_(self.linear.weight)
+        torch.nn.init.zeros_(self.linear.bias)
+        for m in self.output.modules():
+            if isinstance(m,nn.Conv2d):
+                torch.nn.init.xavier_normal_(m.weight)
+                torch.nn.init.zeros_(m.bias)
+
+    def forward(self,z):
+        out = self.linear(z)
+        out = torch.reshape(out,(-1,self.ch,4,4))
+
+        return self.output(self.blocks(out))
+    
 class Discriminator(nn.Module):
     def __init__(self,channel=128):
         super(Discriminator,self).__init__()
@@ -299,12 +306,16 @@ class Discriminator(nn.Module):
 
 
 class WGAN_GP:
-    def __init__(self,g_channel = 256,d_channel=128,z_dim=128,max_iters=100000,batch_size=128,G_checkpoint = None,D_checkpoint=None):
-        
+    def __init__(self,g_channel = 256,d_channel=128,z_dim=128,max_iters=100000,batch_size=128,G_checkpoint = None,D_checkpoint=None,use_sm=False):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.G = SMGenerator(z_dim,g_channel).to(self.device)
-        self.D = Discriminator(d_channel).to(self.device)
+        if use_sm: self.G = SMGenerator(z_dim,g_channel)
+        else: self.G = Generator(z_dim,g_channel)
+
+        self.D = Discriminator(d_channel)
+
+        self.G.to(self.device)
+        self.D.to(self.device)
 
         if G_checkpoint:
             print("Load Generator checkpoint")
@@ -315,6 +326,9 @@ class WGAN_GP:
             print("Load Discriminator checkpoint")
             ckpt = torch.load(D_checkpoint)
             self.D.load_state_dict(ckpt)
+
+
+
 
         self.lr = 2e-4
         self.beta1 = 0
@@ -337,13 +351,15 @@ class WGAN_GP:
 
         self.writer = SummaryWriter()
 
-    def train(self,dataloader):
-        print(f"Train on {self.device}")
-
-        summary(self.G,(64,128))
+    def train(self,dataloader,G_save_path="./models/netG",D_save_path="./models/netD"):
+        summary(self.G,(1024,128))
         summary(self.D,(3,32,32))
 
+        os.makedirs(G_save_path,exist_ok=True)
+        os.makedirs(D_save_path,exist_ok=True)
+
         self.data = self.get_infinite_batches(dataloader)
+
 
         fixed_noise = torch.randn(self.sample_size,self.z_dim).to(self.device)
 
@@ -363,9 +379,9 @@ class WGAN_GP:
                 self.D.zero_grad()
                 self.G.zero_grad()
 
-
                 images = Variable(self.data.__next__()).to(self.device)
                 batch_size = images.size(0)
+
                 d_loss_real = self.D(images)
                 d_loss_real = d_loss_real.mean()
 
@@ -413,7 +429,7 @@ class WGAN_GP:
 
                 IS, IS_std = get_inception_score(fake_images)
 
-                self.save_model()
+                self.save_model(G_save_path,D_save_path)
                 self.writer.add_scalar('Loss/Wasserstein_distance',Wasserstein_loss.item(),g_iter)
                 self.writer.add_scalar('Loss/Loss_D',d_loss.item(),g_iter)
                 self.writer.add_scalar('Loss/Loss_G',g_loss.item(),g_iter)
@@ -427,14 +443,14 @@ class WGAN_GP:
 
             torch.cuda.empty_cache()
         
-        self.save_model()
+        self.save_model(G_save_path,D_save_path)
         self.writer.close()
         print("Finished Training!")
 
     
-    def save_model(self):
-        torch.save(self.G.state_dict(),f"{G_ckpt_path}/netG_ckpt.pth")
-        torch.save(self.D.state_dict(),f"{D_ckpt_path}/netD_ckpt.pth")
+    def save_model(self,G_save_path,D_save_path):
+        torch.save(self.G.state_dict(),f"{G_save_path}/netG_ckpt.pth")
+        torch.save(self.D.state_dict(),f"{D_save_path}/netD_ckpt.pth")
         print("Model saved!")
 
     def get_infinite_batches(self,dataloader):
@@ -454,49 +470,108 @@ class WGAN_GP:
         grad_penalty = ((gradient.norm(2,dim=1) - 1) ** 2).mean() * self.penalty_lambda
 
         return grad_penalty
-
-
-
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-g',help="Generator checkpoint",default=None)
-    parser.add_argument('-d',help="Discriminator checkpoint",default=None)
-    parser.add_argument('--max_iter',help="Max iterations for training",default=100000)
     
-    args = parser.parse_args()
+    def generate_samples(self,sample_size):
+        self.G.eval()
+        noise = torch.randn(sample_size,self.z_dim).to(self.device)
+        fake_images = self.G(noise).detach().cpu().mul(0.5).add(0.5)
 
-    batch_size = 128
-
-    os.makedirs(G_ckpt_path,exist_ok=True)
-    os.makedirs(D_ckpt_path,exist_ok=True)
-
-    # Set random seed
-    randm_seed = random.randint(1,10000)
-    print("Random Seed:" ,randm_seed)
-    random.seed(randm_seed)
-    np.random.seed(randm_seed)
-    torch.manual_seed(randm_seed)
-    torch.cuda.manual_seed_all(randm_seed)
-
-    # get data
-    dataloader = get_cifar_dataset(batch_size)
-
-    # display image
-    batch = next(iter(dataloader))
-    print(f"Standardize image to [{torch.min(batch[0]).item()},{torch.max(batch[0]).item()}]")
-    torchvision.utils.save_image(batch[0].mul(0.5).add(0.5),"images.png")
+        return fake_images
 
 
-    # G = Generator()
-    # D = Discriminator()
-
-    # summary(G,(1024,128))
-    # summary(D,(3,32,32))
 
 
-    wgan_gp = WGAN_GP(g_channel=256,batch_size=batch_size,max_iters=args.max_iter,G_checkpoint=args.g,D_checkpoint=args.d)
-    wgan_gp.train(dataloader)
 
 
+class Inception(nn.Module):
+    def __init__(self, in_planes, kernel_1_x, kernel_3_in, kernel_3_x, kernel_5_in, kernel_5_x, pool_planes):
+        super(Inception, self).__init__()
+        # 1x1 conv branch
+        self.b1 = nn.Sequential(
+            nn.Conv2d(in_planes, kernel_1_x, kernel_size=1),
+            nn.BatchNorm2d(kernel_1_x),
+            nn.ReLU(True),
+        )
+
+        # 1x1 conv -> 3x3 conv branch
+        self.b2 = nn.Sequential(
+            nn.Conv2d(in_planes, kernel_3_in, kernel_size=1),
+            nn.BatchNorm2d(kernel_3_in),
+            nn.ReLU(True),
+            nn.Conv2d(kernel_3_in, kernel_3_x, kernel_size=3, padding=1),
+            nn.BatchNorm2d(kernel_3_x),
+            nn.ReLU(True),
+        )
+
+        # 1x1 conv -> 5x5 conv branch
+        self.b3 = nn.Sequential(
+            nn.Conv2d(in_planes, kernel_5_in, kernel_size=1),
+            nn.BatchNorm2d(kernel_5_in),
+            nn.ReLU(True),
+            nn.Conv2d(kernel_5_in, kernel_5_x, kernel_size=3, padding=1),
+            nn.BatchNorm2d(kernel_5_x),
+            nn.ReLU(True),
+            nn.Conv2d(kernel_5_x, kernel_5_x, kernel_size=3, padding=1),
+            nn.BatchNorm2d(kernel_5_x),
+            nn.ReLU(True),
+        )
+
+        # 3x3 pool -> 1x1 conv branch
+        self.b4 = nn.Sequential(
+            nn.MaxPool2d(3, stride=1, padding=1),
+            nn.Conv2d(in_planes, pool_planes, kernel_size=1),
+            nn.BatchNorm2d(pool_planes),
+            nn.ReLU(True),
+        )
+
+    def forward(self, x):
+        y1 = self.b1(x)
+        y2 = self.b2(x)
+        y3 = self.b3(x)
+        y4 = self.b4(x)
+        return torch.cat([y1,y2,y3,y4], 1)
+
+
+class GoogLeNet(nn.Module):
+    def __init__(self):
+        super(GoogLeNet, self).__init__()
+        self.pre_layers = nn.Sequential(
+            nn.Conv2d(3, 192, kernel_size=3, padding=1),
+            nn.BatchNorm2d(192),
+            nn.ReLU(True),
+        )
+
+        self.a3 = Inception(192,  64,  96, 128, 16, 32, 32)
+        self.b3 = Inception(256, 128, 128, 192, 32, 96, 64)
+
+        self.max_pool = nn.MaxPool2d(3, stride=2, padding=1)
+
+        self.a4 = Inception(480, 192,  96, 208, 16,  48,  64)
+        self.b4 = Inception(512, 160, 112, 224, 24,  64,  64)
+        self.c4 = Inception(512, 128, 128, 256, 24,  64,  64)
+        self.d4 = Inception(512, 112, 144, 288, 32,  64,  64)
+        self.e4 = Inception(528, 256, 160, 320, 32, 128, 128)
+
+        self.a5 = Inception(832, 256, 160, 320, 32, 128, 128)
+        self.b5 = Inception(832, 384, 192, 384, 48, 128, 128)
+
+        self.avgpool = nn.AvgPool2d(8, stride=1)
+        self.linear = nn.Linear(1024, 10)
+
+    def forward(self, x):
+        x = self.pre_layers(x)
+        x = self.a3(x)
+        x = self.b3(x)
+        x = self.max_pool(x)
+        x = self.a4(x)
+        x = self.b4(x)
+        x = self.c4(x)
+        x = self.d4(x)
+        x = self.e4(x)
+        x = self.max_pool(x)
+        x = self.a5(x)
+        x = self.b5(x)
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.linear(x)
+        return x
