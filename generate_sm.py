@@ -338,7 +338,10 @@ class WGAN_GP:
 
     def train(self,dataloader):
         print(f"Train on {self.device}")
+        
+        print(f"load G to {self.device}")
         self.G.to(self.device)
+        print(f"load D to {self.device}")
         self.D.to(self.device)
 
         # summary(self.G,(1024,128))
