@@ -337,13 +337,14 @@ class WGAN_GP:
         self.writer = SummaryWriter()
 
     def train(self,dataloader):
+        print(f"Train on {self.device}")
+        self.G.to(self.device)
+        self.D.to(self.device)
+
         summary(self.G,(1024,128))
         summary(self.D,(3,32,32))
 
         self.data = self.get_infinite_batches(dataloader)
-
-        self.G.to(self.device)
-        self.D.to(self.device)
 
         fixed_noise = torch.randn(self.sample_size,self.z_dim).to(self.device)
 
