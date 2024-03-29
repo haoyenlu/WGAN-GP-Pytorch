@@ -297,12 +297,7 @@ class Discriminator(nn.Module):
             nn.ReLU(),
         )
 
-        self.linear = nn.Linear(channel,1,bias=False)
-        self.initialize()
-
-    def initialize(self):
-        torch.nn.init.xavier_normal_(self.linear.weight)
-        if self.use_sn: spectral_norm(self.linear)
+        self.linear = nn.Linear(channel,1)
 
 
     def forward(self,x):
@@ -353,6 +348,7 @@ class WGAN_GP:
         self.max_iters = max_iters
         self.z_dim = z_dim
         self.batch_size = batch_size
+        self.g_channel = g_channel
         self.sample_size = 64
 
         self.writer = SummaryWriter()
@@ -455,8 +451,8 @@ class WGAN_GP:
 
     
     def save_model(self,G_save_path,D_save_path):
-        torch.save(self.G.state_dict(),f"{G_save_path}/netG_ckpt.pth")
-        torch.save(self.D.state_dict(),f"{D_save_path}/netD_ckpt.pth")
+        torch.save(self.G.state_dict(),f"{G_save_path}/netG_{self.g_channel}_ckpt.pth")
+        torch.save(self.D.state_dict(),f"{D_save_path}/netD_{self.g_channel}_ckpt.pth")
         print("Model saved!")
 
     def get_infinite_batches(self,dataloader):

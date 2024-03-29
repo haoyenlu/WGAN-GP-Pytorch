@@ -105,6 +105,7 @@ if __name__ == "__main__":
     parser.add_argument('--g_channel',type=int,help="Generator Residual block channel",default=256)
     parser.add_argument('--use_sm',action="store_true",help="Use self-modulate generator")
     parser.add_argument('--save_pth',help="Path to image saving folder",default="./samples")
+    parser.add_argument('--save_name',help="Sample image save name",default="sample.png")
     parser.add_argument('--train_inception',action="store_true",help="Train inception")
     args = parser.parse_args()
 
@@ -134,7 +135,7 @@ if __name__ == "__main__":
     fake_images = wgan_gp.generate_samples(args.sample_size)
     grid = torchvision.utils.make_grid(fake_images,nrow=10)
 
-    torchvision.utils.save_image(grid,f"{args.save_pth}/samples.png")
+    torchvision.utils.save_image(grid,f"{args.save_pth}/{args.save_name}")
 
     
     model.to(torch.device('cpu'))
