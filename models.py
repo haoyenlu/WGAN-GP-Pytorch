@@ -144,15 +144,13 @@ class OptimizedResBlockDown(nn.Module):
             nn.ReLU(),
             nn.Conv2d(in_channel,out_channel,kernel_size,padding=padding),
             nn.ReLU(),
-            nn.Conv2d(out_channel,out_channel,kernel_size,padding=padding),
-            nn.AvgPool2d(2)
+            nn.Conv2d(out_channel,out_channel,kernel_size,stride=2,padding=1),
         )
 
         self.shortcut = nn.Sequential(
-            # nn.AvgPool2d(2),
-            nn.Conv2d(in_channel,out_channel,kernel_size=1,padding=padding),
-            nn.AvgPool2d(2)
+            nn.Conv2d(in_channel,out_channel,kernel_size=1,stride=2,padding=1),
         )
+        
         self.initialize()
 
     def initialize(self):
@@ -182,14 +180,16 @@ class ResBlockDown(nn.Module):
             nn.ReLU(),
             nn.Conv2d(in_channel,out_channel,kernel_size=kernel_size,padding=padding),
             nn.ReLU(),
-            nn.Conv2d(out_channel,out_channel,kernel_size=kernel_size,padding=padding)
         ]
         if down: 
-            residual.append(nn.AvgPool2d(2))
+            residual.append(nn.Conv2d(out_channel,out_channel,kernel_size=kernel_size,stride=2,padding=1))
+        
 
-        shortcut = [nn.Conv2d(in_channel,out_channel,kernel_size=1,padding="same")]
+        shortcut = []
         if down:
-            shortcut.append(nn.AvgPool2d(2))
+            shortcut.append(nn.Conv2d(in_channel,out_channel,kernel_size=1,stride=2,padding=1))
+        else:
+            shortcut.append(nn.Conv2d(in_channel,out_channel,kernel_size=1,padding="same"))
 
         self.residual = nn.Sequential(*residual)
         self.shortcut = nn.Sequential(*shortcut)
