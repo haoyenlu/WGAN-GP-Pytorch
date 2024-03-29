@@ -29,8 +29,8 @@ class SM_Layer(nn.Module): # forward the
         torch.nn.init.zeros_(self.linear1.bias)
         torch.nn.init.xavier_normal_(self.linear2.weight)
 
-        spectral_norm(self.linear1)
-        spectral_norm(self.linear2)
+        # spectral_norm(self.linear1)
+        # spectral_norm(self.linear2)
     
     
     def forward(self,z):
@@ -135,8 +135,10 @@ class ResBlockUp(nn.Module):
         return self.residual(x) + self.shortcut(x)
 
 class OptimizedResBlockDown(nn.Module):
-    def __init__(self,in_channel,out_channel,kernel_size=3,padding="same"):
+    def __init__(self,in_channel,out_channel,kernel_size=3,padding="same",use_sn=False):
         super(OptimizedResBlockDown,self).__init__()
+
+        self.use_sn = use_sn
 
         self.residual = nn.Sequential(
             nn.ReLU(),
@@ -158,12 +160,12 @@ class OptimizedResBlockDown(nn.Module):
             if isinstance(m, nn.Conv2d):
                 torch.nn.init.xavier_normal_(m.weight)
                 torch.nn.init.zeros_(m.bias)
-                spectral_norm(m)
+                if self.use_sn: spectral_norm(m)
         for m in self.shortcut.modules():
             if isinstance(m, nn.Conv2d):
                 torch.nn.init.xavier_normal_(m.weight)
                 torch.nn.init.zeros_(m.bias)
-                spectral_norm(m)
+                if self.use_sn: spectral_norm(m)
 
 
     def forward(self,x):
@@ -171,8 +173,10 @@ class OptimizedResBlockDown(nn.Module):
     
 
 class ResBlockDown(nn.Module):
-    def __init__(self,in_channel,out_channel,kernel_size=3,padding="same",down=False):
+    def __init__(self,in_channel,out_channel,kernel_size=3,padding="same",down=False,use_sn=False):
         super(ResBlockDown,self).__init__()
+
+        self.use_sn = use_sn
 
         residual = [
             nn.ReLU(),
@@ -197,12 +201,12 @@ class ResBlockDown(nn.Module):
             if isinstance(m, nn.Conv2d):
                 torch.nn.init.xavier_normal_(m.weight)
                 torch.nn.init.zeros_(m.bias)
-                spectral_norm(m)
+                if self.use_sn: spectral_norm(m)
         for m in self.shortcut.modules():
             if isinstance(m, nn.Conv2d):
                 torch.nn.init.xavier_normal_(m.weight)
                 torch.nn.init.zeros_(m.bias)
-                spectral_norm(m)
+                if self.use_sn: spectral_norm(m)
 
     def forward(self,x):
         return self.residual(x) + self.shortcut(x)
@@ -280,14 +284,16 @@ class Generator(nn.Module):
         return self.output(self.blocks(out))
     
 class Discriminator(nn.Module):
-    def __init__(self,channel=128):
+    def __init__(self,channel=128,use_sn=False):
         super(Discriminator,self).__init__()
 
+        self.use_sn = use_sn
+
         self.model = nn.Sequential(
-            OptimizedResBlockDown(in_channel=3,out_channel=channel,kernel_size=3),
-            ResBlockDown(in_channel=channel,out_channel=channel,kernel_size=3,down=True),
-            ResBlockDown(in_channel=channel,out_channel=channel,kernel_size=3),
-            ResBlockDown(in_channel=channel,out_channel=channel,kernel_size=3),
+            OptimizedResBlockDown(in_channel=3,out_channel=channel,kernel_size=3,use_sn=use_sn),
+            ResBlockDown(in_channel=channel,out_channel=channel,kernel_size=3,down=True,use_sn=use_sn),
+            ResBlockDown(in_channel=channel,out_channel=channel,kernel_size=3,use_sn=use_sn),
+            ResBlockDown(in_channel=channel,out_channel=channel,kernel_size=3,use_sn=use_sn),
             nn.ReLU(),
         )
 
@@ -296,7 +302,7 @@ class Discriminator(nn.Module):
 
     def initialize(self):
         torch.nn.init.xavier_normal_(self.linear.weight)
-        spectral_norm(self.linear)
+        if self.use_sn: spectral_norm(self.linear)
 
 
     def forward(self,x):
@@ -306,13 +312,13 @@ class Discriminator(nn.Module):
 
 
 class WGAN_GP:
-    def __init__(self,g_channel = 256,d_channel=128,z_dim=128,max_iters=100000,batch_size=128,G_checkpoint = None,D_checkpoint=None,use_sm=False):
+    def __init__(self,g_channel = 256,d_channel=128,z_dim=128,max_iters=100000,batch_size=128,G_checkpoint = None,D_checkpoint=None,use_sm=False,use_sn=False):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         if use_sm: self.G = SMGenerator(z_dim,g_channel)
         else: self.G = Generator(z_dim,g_channel)
 
-        self.D = Discriminator(d_channel)
+        self.D = Discriminator(d_channel,use_sn=use_sn)
 
         self.G.to(self.device)
         self.D.to(self.device)

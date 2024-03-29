@@ -1,4 +1,6 @@
 ### WGAN-GP Pytorch implementation
+Pytorch implementation of WGAN with Gradient Penalty and Self-modulated Batch Norm
+
 
 #### Pretrained model download:
 * Generator
