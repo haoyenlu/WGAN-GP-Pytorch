@@ -148,7 +148,7 @@ class OptimizedResBlockDown(nn.Module):
         )
 
         self.shortcut = nn.Sequential(
-            nn.Conv2d(in_channel,out_channel,kernel_size=1,stride=2,padding=1),
+            nn.Conv2d(in_channel,out_channel,kernel_size=2,stride=2,padding=1),
         )
 
         self.initialize()
