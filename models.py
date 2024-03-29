@@ -358,7 +358,7 @@ class WGAN_GP:
         self.writer = SummaryWriter()
 
     def train(self,dataloader,G_save_path="./models/netG",D_save_path="./models/netD"):
-        summary(self.G,(1024,128))
+        summary(self.G,(self.batch_size,128))
         summary(self.D,(3,32,32))
 
         os.makedirs(G_save_path,exist_ok=True)
