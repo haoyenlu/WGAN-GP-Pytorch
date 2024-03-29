@@ -144,12 +144,12 @@ class OptimizedResBlockDown(nn.Module):
             nn.ReLU(),
             nn.Conv2d(in_channel,out_channel,kernel_size,padding=padding),
             nn.ReLU(),
-            nn.Conv2d(out_channel,out_channel,kernel_size,stride=2,padding=1),
+            nn.Conv2d(out_channel,out_channel,kernel_size+1,stride=2,padding=1),
         )
 
         self.shortcut = nn.Sequential(
             nn.AvgPool2d(2),
-            nn.Conv2d(in_channel,out_channel,kernel_size=1,stride=2,padding=1),
+            nn.Conv2d(in_channel,out_channel,kernel_size=1,padding="same"),
         )
 
         self.initialize()
@@ -183,14 +183,14 @@ class ResBlockDown(nn.Module):
             nn.ReLU(),
         ]
         if down: 
-            residual.append(nn.Conv2d(out_channel,out_channel,kernel_size=kernel_size + 1,stride=2,padding=1))
+            residual.append(nn.Conv2d(out_channel,out_channel,kernel_size=kernel_size+1,stride=2,padding=1))
         
 
         shortcut = []
         if down:
             shortcut.append(nn.AvgPool2d(2))
 
-        shortcut.append(nn.Conv2d(in_channel,out_channel,kernel_size=1,stride=2,padding=1))
+        shortcut.append(nn.Conv2d(in_channel,out_channel,kernel_size=1,padding=padding))
 
 
         self.residual = nn.Sequential(*residual)
