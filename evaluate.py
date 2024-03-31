@@ -110,8 +110,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     os.makedirs(args.save_pth,exist_ok=True)
-    incep_model_path = "./inception_model/v3.pth"
-    os.makedirs(incep_model_path,exist_ok=True)
+    incep_model_save = "./inception_model"
+    incep_model_path = "v3.pth"
+    os.makedirs(incep_model_save,exist_ok=True)
 
     if args.train_inception:
         transform = transforms.Compose([
@@ -124,10 +125,10 @@ if __name__ == "__main__":
 
         train_loader = torch.utils.data.DataLoader(train_dataset,batch_size=64,shuffle=True,num_workers=2)
         test_loader = torch.utils.data.DataLoader(test_dataset,batch_size=64,shuffle=False,num_workers=2)
-        model = train_inceptionV3(train_loader,test_loader,save_path=incep_model_path)
+        model = train_inceptionV3(train_loader,test_loader,save_path=os.path.join(incep_model_save,incep_model_path))
 
     else:
-        ckpt = torch.load(incep_model_path)
+        ckpt = torch.load(os.path.join(incep_model_save,incep_model_path))
         model = GoogLeNet()
         model.load_state_dict(ckpt)
 
