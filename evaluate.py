@@ -111,7 +111,7 @@ if __name__ == "__main__":
 
     os.makedirs(args.save_pth,exist_ok=True)
     incep_model_path = "./inception_model/v3.pth"
-    os.makedirs(args.save_pth,exist_ok=True)
+    os.makedirs(incep_model_path,exist_ok=True)
 
     if args.train_inception:
         transform = transforms.Compose([
